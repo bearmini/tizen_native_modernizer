@@ -13,3 +13,4 @@
 *.a
 
 .sign/
+crash-info/

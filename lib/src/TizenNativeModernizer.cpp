@@ -8,6 +8,7 @@
 #include "TizenNativeModernizer.h"
 
 // C++ headers
+#include <iostream>
 #include <memory>
 
 // Tizen headers
@@ -16,7 +17,10 @@
 using namespace Tizen::Base;
 using namespace Tizen::Base::Collection;
 
+namespace tnm
+{
 
+// improvements for std::string
 std::vector<std::string>
 split(const std::string& str, const std::string& delim)
 {
@@ -34,20 +38,50 @@ split(const std::string& str, const std::string& delim)
 	return result;
 }
 
+std::string
+ltrim(const std::string& str)
+{
+	std::string s(str);
+	s.erase(s.begin(), std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<int, int>(std::isspace))));
+	return s;
+}
+
+std::string
+rtrim(const std::string& str)
+{
+	std::string s(str);
+	s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
+	return s;
+}
+
+std::string
+trim(const std::string& s)
+{
+	return ltrim(rtrim(s));
+}
+
 template<class fk_t, class fv_t>
 IMap* gen_hashmap(const std::string& str, fk_t fk, fv_t fv)
 {
-	HashMap* pMap = new HashMap(SingleObjectDeleter);
+	auto pMap = new HashMap(SingleObjectDeleter);
 	pMap->Construct();
 
-	std::vector<std::string>&& a = split(str, ",");
+	auto&& a = split(str, ",");
 	std::for_each(a.begin(), a.end(), [pMap, fk, fv](const std::string& s){
-		std::vector<std::string>&& kv = split(s, "=>");
-		if (kv.size() != 2)
+		auto&& kv = split(s, "=>");
+		if (kv.size() < 2)
+		{
 			return;
+		}
 
-		auto k = kv[0];
-		auto v = kv[1];
+		auto&& k = trim(kv[0]);
+		if (k == "")
+		{
+			return;
+		}
+
+		auto&& v = trim(kv[1]);
+
 		pMap->Add(fk(k), fv(v));
 	});
 
@@ -72,13 +106,33 @@ _EXPORT_ void iterate_on_map(const IMap* pMap, fun_t f)
 }
 
 std::string
-stlstr(const String& str)
+stlstr(const Object* pObj)
 {
-	size_t length = ::wcstombs(null, str.GetPointer(), 0);
+	auto pStr = dynamic_cast<const String*>(pObj);
+	if (pStr != null)
+	{
+		return stlstr(pStr);
+	}
+	else
+	{
+		return "";
+	}
+}
+
+std::string
+stlstr(const String* pStr)
+{
+	size_t length = ::wcstombs(null, pStr->GetPointer(), 0);
 	scoped_array<char> buf(new char[length + 1]);
 	::memset(buf.get(), 0, length + 1);
-	::wcstombs(buf.get(), str.GetPointer(), length);
+	::wcstombs(buf.get(), pStr->GetPointer(), length);
 	return std::string(buf.get());
+}
+
+std::string
+stlstr(const String& str)
+{
+	return stlstr(&str);
 }
 
 template<class T>
@@ -108,4 +162,6 @@ stlmap(const IMap* pMap)
 		result.insert(make_pair(key, val));
 	});
 	return result;
+}
+
 }
